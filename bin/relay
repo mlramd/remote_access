@@ -1,0 +1,144 @@
+#!/usr/bin/python3
+#
+# Simple relay control for the Denkovi USB Relay Module 4 Channels, for Home Automation - v2
+# http://denkovi.com/usb-relay-board-four-channels-for-home-automation-v2
+#
+# Better tools are offered on http://denkovi.com but they need an internet
+# connection, and are not open source.
+#
+# To install the required libraries:
+# sudo apt-get install python-pip; sudo pip install pyusb
+
+__author__     = "Martin Roth"
+__copyright__  = "Copyright 2017 Google Inc."
+
+__license__ = "GPL v2"
+__version__ = "0.0.1"
+__email__ = "gaumless@gmail.com"
+__status__ = "Development"
+
+import usb.core
+import usb.util
+import sys
+
+# Check for pyusb 1.0.0 - Lots of incompatibilities with older versions.
+# We're not exiting, because it *COULD* work.
+if hasattr(usb, 'version_info'):
+    if usb.version_info[0] < 1:
+        print("You probably want a newer version of pyusb")
+else:
+        print("You probably want a newer version of pyusb")
+
+# Set some global variables
+list_devices = False # True if just listing devices
+serial = 0           # Serial number from command line
+serial_num = 0       # Serial number read from device
+set_bmp = -1         # Relay configuration from command line
+clr_bmp = 0          # Relay configuration from command line
+reattach = [0,0,0]   # Interfaces detatched from the kernel
+
+# Define the command structures that are being used
+get_status_cmd = [0]*16
+get_status_cmd[0]=0x80
+cfg_cmd = [0]*16
+cfg_cmd[0] = 0x10
+cfg_cmd[4] = 0xf0
+cfg_cmd[8] = 0x04
+cfg_cmd[9] = 0xe1
+
+# Check command line arguments
+if (len(sys.argv) == 1) or (sys.argv[1] == "--help"):
+    print("Usage: %s <list|serial No> [bits to set] [bits to clear]" % sys.argv[0])
+    print("Examples:")
+    print("  relay list              - Shows all attached relay boards")
+    print("  relay 0001652501        - Shows current relay status")
+    print("  relay 0001652501 0x0f   - Enable all relays")
+    print("  relay 0001652501 0 0x0f - Disable all relays")
+    print("  relay 0001652501 8 7    - Enable just relay 4")
+    exit(0)
+
+if sys.argv[1] == 'list':
+    list_devices = True
+else:
+    serial = sys.argv[1]
+
+if (list_devices == False) and (len(sys.argv) > 2):
+    set_bmp = int(sys.argv[2], 16)
+    #print("bits to set %s" % set_bmp)
+
+if (list_devices == False) and (len(sys.argv) > 3):
+    clr_bmp = int(sys.argv[3], 16)
+    #print("bits to clear: %s" % clr_bmp)
+
+# Find all the MCP2200 devices
+usbdevs = usb.core.find(find_all=True, idVendor=0x04d8, idProduct=0x00df)
+
+# Loop through and print devices found or select requested device
+for dev in usbdevs:
+    serial_num = usb.util.get_string(dev,dev.iSerialNumber)
+    if list_devices == True:
+        print("Serial Number: ", serial_num)
+    elif serial_num == serial:
+        break
+
+# Make sure we found specified device, or exit if we were just listing
+if serial_num == 0:
+    print("No devices found")
+    exit(1)
+elif list_devices == True:
+    exit(0)
+elif serial_num != serial:
+    print("Error: Serial Number %s not found." % serial)
+    exit(1)
+
+# Get the configuration, and detach every interface from the kernel
+# We get a 'usb.core.USBError: [Errno 16] Resource busy' error otherwise
+# Save the interfaces we detached for re-attachment later
+cfg = dev.get_active_configuration()
+for i in range(cfg.bNumInterfaces):
+    if dev.is_kernel_driver_active(i):
+        reattach[i]=1
+        dev.detach_kernel_driver(i)
+
+# Because we know the device, just set the endpoints directly
+epin = dev[0][(2,0)][0]
+epout = dev[0][(2,0)][1]
+
+# No idea why this would happen, but hey, checking is good.
+if (epin is None) or (epout is None):
+    print("endpoint not found.")
+    exit(1)
+
+# Get the current status of the relays
+#print(f'cfg: {cfg_cmd=}')
+#print(f'sts: {get_status_cmd=}')
+dev.write(epout.bEndpointAddress, cfg_cmd)
+dev.write(epout.bEndpointAddress, get_status_cmd)
+status = dev.read(epin.bEndpointAddress,16,1000)
+
+# Set the relays if requested
+if set_bmp != -1:
+    set_cmd = [0]*16
+    set_cmd[0] = 0x08
+    set_cmd[11] = set_bmp
+    set_cmd[12] = clr_bmp
+    #print(f'set: {set_cmd=}')
+    dev.write(epout.bEndpointAddress, set_cmd)
+    dev.write(epout.bEndpointAddress, get_status_cmd)
+    status = dev.read(epin.bEndpointAddress,16,1000)
+
+# Display the current value of the GPIOs / Relays
+# print("EEP_Addr: 0x%02x"%status[1])
+# print("EEP_Val:  0x%02x"%status[3])
+# print("IO_Bmp:   0x%02x"%status[4])
+# print("Alt_cfg:  0x%02x"%status[5])
+# print("Def_bmp:  0x%02x"%status[6])
+# print("alt_func: 0x%02x"%status[7])
+# print("val_bmp:  0x%02x"%status[10])
+print("0x%02x"%status[10])
+
+# Clean up and release the device
+usb.util.release_interface(dev,2)
+usb.util.dispose_resources(dev)
+
+exit(0)
