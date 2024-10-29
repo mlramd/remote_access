@@ -1,0 +1,127 @@
+#!/usr/bin/bash
+
+usage() {
+	echo "Usage: $(basename $0) [options] <BOARD_NAME>"
+	echo "Options:"
+	echo "         -h | --help   - This rubbish."
+	echo "         -r | --remove - Remove the board instead of creating it."
+}
+
+require_pkg() {
+	if ! command -v $1 &>/dev/null; then
+		echo "Error: $1 is required but not installed. Exiting."
+		exit 1
+	fi
+}
+
+if [[ -n "${DEBUG}" ]]; then set -x; fi
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd | sed 's|/remote_access.*||')
+WORKDIR="${SCRIPT_DIR}/remote_access"
+
+if [[ "$1" = "-r" || "$1" = "--remove" ]]; then
+	shift
+	REMOVE_BOARD=1
+elif [[ "$1" = "-h" || "$1" = "--help" ]]; then
+	usage
+	exit 0
+fi
+
+BOARD=$1
+if [[ -z "${BOARD}" ]]; then
+	usage
+	exit 1
+fi
+
+source "${WORKDIR}/_board_helpers.sh" || exit 1
+
+if [[ ${WORKDIR} != "${HELPER_DIR}" ]]; then
+	echo "Error: Directory found for helper files is not the same as what"
+	echo "       is configured in the global config. Exiting."
+	exit 1
+fi
+
+# BIN_DIR should be set in global config - this should be in your path.
+cd "${BIN_DIR}" || exit 1
+
+require_pkg "picocom"
+require_pkg "minicom"
+require_pkg "dpcmd"
+require_pkg "flashrom"
+
+sudo find "${WORKDIR}" -type l -name "${BOARD}_*" -delete
+sudo find "${BIN_DIR}" -type l -name "${BOARD}" -delete
+
+if [[ ${REMOVE_BOARD} -eq 1 ]]; then
+	echo "${BOARD} was removed."
+	exit 0
+fi
+
+sudo ln -f -s "${HELPER_DIR}/_board.sh"                 "${BIN_DIR}/${BOARD}"
+sudo ln -f -s "${HELPER_DIR}/_board_status.sh"          "${HELPER_DIR}/${BOARD}-status"
+sudo ln -f -s "${HELPER_DIR}/_board_reserve_release.sh" "${HELPER_DIR}/${BOARD}-reserve"
+sudo ln -f -s "${HELPER_DIR}/_board_reserve_release.sh" "${HELPER_DIR}/${BOARD}-release"
+sudo ln -f -s "${HELPER_DIR}/set_user.sh"               "${HELPER_DIR}/${BOARD}-set-user"
+
+if [[ -n "${IP_ADDRESS}" || -n "${WIFI_IP}" ]]; then
+  sudo ln -f -s "${HELPER_DIR}/_board_ssh.sh"           "${HELPER_DIR}/${BOARD}-ssh"
+fi
+
+if [[ ${POWER_CONTROL} -eq 1 ]]; then
+	sudo ln -f -s "${HELPER_DIR}/_board_power_on_off.sh"  "${HELPER_DIR}/${BOARD}-power-on"
+	sudo ln -f -s "${HELPER_DIR}/_board_power_on_off.sh"  "${HELPER_DIR}/${BOARD}-power-off"
+fi
+
+if [[ "${USE_SERVOD}" -eq 1 || "${USE_USB_RELAY}" -eq 1 ]]; then
+	sudo ln -f -s "${HELPER_DIR}/_board_on_off.sh"        "${HELPER_DIR}/${BOARD}-on"
+	sudo ln -f -s "${HELPER_DIR}/_board_on_off.sh"        "${HELPER_DIR}/${BOARD}-off"
+	sudo ln -f -s "${HELPER_DIR}/_board_reset.sh"         "${HELPER_DIR}/${BOARD}-reset"
+fi
+
+if [[ "${USE_SERVOD}" -eq 1 ]]; then
+	sudo ln -f -s "${HELPER_DIR}/_board_picocom.sh"       "${HELPER_DIR}/${BOARD}-cpu-picocom"
+	sudo ln -f -s "${HELPER_DIR}/_board_picocom.sh"       "${HELPER_DIR}/${BOARD}-ec-picocom"
+	sudo ln -f -s "${HELPER_DIR}/_board_picocom.sh"       "${HELPER_DIR}/${BOARD}-gsc-picocom"
+	sudo ln -f -s "${HELPER_DIR}/_board_minicom.sh"       "${HELPER_DIR}/${BOARD}-cpu-minicom"
+	sudo ln -f -s "${HELPER_DIR}/_board_minicom.sh"       "${HELPER_DIR}/${BOARD}-ec-minicom"
+	sudo ln -f -s "${HELPER_DIR}/_board_minicom.sh"       "${HELPER_DIR}/${BOARD}-gsc-minicom"
+
+	sudo ln -f -s "${HELPER_DIR}/_board_start_servod.sh"  "${HELPER_DIR}/${BOARD}-servod-start"
+
+	sudo ln -f -s "${HELPER_DIR}/_dut_control.sh"         "${HELPER_DIR}/${BOARD}-dut-control"
+fi
+
+if [[ "${USE_SERVOD}" -eq 1 || "${USE_DEDIPROG}" -eq 1 ]]; then
+	sudo ln -f -s "${HELPER_DIR}/_board_flash.sh"         "${HELPER_DIR}/${BOARD}-flash"
+	if [[ -n "${KNOWN_GOOD_ROM}" ]]; then
+		sudo ln -f -s "${HELPER_DIR}/_board_flash.sh"       "${HELPER_DIR}/${BOARD}-flash-known-good"
+	fi
+fi
+
+if [[ "${USE_FTDI_SERIAL}" -eq 1 ]]; then
+	if [[ -n ${AP_UART_SERIAL} ]]; then
+		sudo ln -f -s "${HELPER_DIR}/_board_picocom.sh"     "${HELPER_DIR}/${BOARD}-ap-picocom"
+		sudo ln -f -s "${HELPER_DIR}/_board_minicom.sh"     "${HELPER_DIR}/${BOARD}-ap-minicom"
+	fi
+	if [[ -n ${EC_UART_SERIAL} ]]; then
+		sudo ln -f -s "${HELPER_DIR}/_board_picocom.sh"     "${HELPER_DIR}/${BOARD}-ec-picocom"
+		sudo ln -f -s "${HELPER_DIR}/_board_minicom.sh"     "${HELPER_DIR}/${BOARD}-ec-minicom"
+	fi
+fi
+
+if [[ ${USE_CAMERA} -eq 1 ]]; then
+	sudo ln -f -s "${HELPER_DIR}/_board_camera.sh"        "${HELPER_DIR}/${BOARD}-photo"
+	sudo ln -f -s "${HELPER_DIR}/_board_camera.sh"        "${HELPER_DIR}/${BOARD}-video"
+fi
+
+mkdir -p "${LOG_DIR}"
+touch "${CMDLIST}"
+sudo chown -R "${GENERAL_USER}:${GENERAL_GROUP}" "${CMDLIST}"
+sudo chmod -R g+w "${CMDLIST}"
+
+mkdir -p "${BOARD_DIR}/incoming"
+mkdir -p "${BOARD_DIR}/archive"
+sudo chown -R "${GENERAL_USER}:${GENERAL_GROUP}" "${BOARD_DIR}"
+sudo chmod -R g+w "${BOARD_DIR}"
+
+echo "Board configuration complete."

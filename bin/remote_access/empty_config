@@ -1,0 +1,59 @@
+#!/usr/bin/bash
+
+# The empty config should zero all values
+
+export BOARD_NAME=""
+export VARIANT_NAME=""
+export BOARD_REV=""
+export BOARD_VERSION=""
+export BOARD_INFO=""
+
+export POWER_CONTROL=0
+export USE_WEBPOWER=0
+export  WEBPOWER_HOST=""
+export  POWER_OUTLET_NUM=""
+
+export USE_DEDIPROG=0
+export  USE_FLASHROM=0 # Otherwise use dpcmd
+export  DEDIPROG_SERIAL=""
+# dpcmd voltages: 0: 3.5V, 1: 2.5V, 2: 1.8V
+# flashrom voltages: 1.8V, 2.5V, 3.5V
+export  DEDIPROG_VOLTAGE=""
+# dpcmd speeds: 0: 24 MHz, 1: 8 MHz, 2: 12 MHz(Default), 3: 3 MHz, 4: 2.18 MHz, 5: 1.5 MHz, 6: 750 KHz, 7: 375 KHz     
+# flashrom speeds:  375k, 750k, 1.5M, 2.18M, 3M, 8M, 12M or 24M
+export  DEDIPROG_SPEED="" 
+
+# Relay numbers can be 0x01 to 0x80
+export USE_USB_RELAY=0
+export  USB_RELAY_SERIAL=""
+export  USB_RELAY_POWER_SWITCH=""
+export  USB_RELAY_COLD_RESET_SWITCH=""
+export  USB_RELAY_RESET_DEDIPROG=""
+export  USB_RELAY_BOARD_ON=""
+export  USB_RELAY_BOARD_POWER=""
+
+export USE_SERVOD=0
+export  USE_SERVO_CONTAINER=0
+export  USE_CROS_DIRECTORY=0
+export  SERVOD_PORT=""
+export  SERVO_SERIAL=""
+export  FLASH_WITH_SERVO=0
+export  PRE_FLASH_CMD=""
+export  POST_FLASH_CMD=""
+
+export USE_HDT=0
+export  HDT_IP=""
+
+export IP_ADDRESS=""
+export WIFI_IP=""
+export SSH_KEY=""
+
+export USE_CAMERA=0
+export  VIDEO_DEV_NAME=""
+
+export USE_FTDI_SERIAL=0
+export  AP_UART_SERIAL=""
+export  EC_UART_SERIAL=""
+
+# Full path to rom - may use BOARD_DIR variable
+export KNOWN_GOOD_ROM=""

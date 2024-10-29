@@ -1,0 +1,64 @@
+#!/usr/bin/bash
+
+set_permissions() {
+	FILE_OR_DIR=$1
+	sudo chown -R "${GENERAL_USER}:${GENERAL_GROUP}" "${FILE_OR_DIR}" 
+	sudo chmod -R g+wx "${FILE_OR_DIR}" 
+}
+
+if [[ -f ./remote_access.conf ]]; then
+	source ./remote_access.conf || exit 1
+else
+	echo "Error: ${PWD}/remote_access.conf does not exist"
+	exit 1
+fi
+
+if [[ -z "${GENERAL_USER}" ]]; then
+	echo "Error: GENERAL_USER is not set."
+	exit 1
+fi
+
+if [[ -z "${GENERAL_GROUP}" ]]; then
+	echo "Error: GENERAL_GROUP is not set."
+	exit 1
+fi
+
+if [[ -z "${HELPER_DIR}" ]]; then
+	echo "Error: HELPER_DIR is not set."
+	exit 1
+fi
+
+if [[ -z "${CONFIG_DIR}" ]]; then
+	echo "Error: CONFIG_DIR is not set."
+	exit 1
+fi
+
+if [[ -z "${BIN_DIR}" ]]; then
+	echo "Error: BIN_DIR is not set."
+	exit 1
+fi
+
+if ! groups "${GENERAL_USER}"; then
+	echo "Error: User ${GENERAL_USER} does not seem to exist."
+	exit 1
+fi
+
+if ! groups "${GENERAL_USER}" | grep -q "${GENERAL_GROUP}"; then
+	echo "Error: User ${GENERAL_USER} does not seem to be in the group ${GENERAL_GROUP}."
+	exit 1
+fi
+
+sudo ln -s -f "${HELPER_DIR}/remote_access.conf" /etc/remote_access.conf
+set_permissions "/etc/remote_access.conf"
+
+sudo mkdir -p "${CONFIG_DIR}"
+sudo ln -s -f "${HELPER_DIR}/empty_config" "${CONFIG_DIR}/empty_config"
+set_permissions "${CONFIG_DIR}"
+
+sudo ln -s -f "${HELPER_DIR}/show_boards" "${BIN_DIR}/show_boards"
+set_permissions "${BIN_DIR}/show_boards"
+
+sudo ln -s -f "${HELPER_DIR}/setup_board" "${BIN_DIR}/setup_board"
+set_permissions "${BIN_DIR}/setup_board"
+
+echo "Done."

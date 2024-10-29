@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+
+if [[ -n "${DEBUG}" ]]; then set -x; fi
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd | sed 's|/remote_access.*||' )
+WORKDIR="${SCRIPT_DIR}/remote_access"
+
+if [[ -f "/etc/remote_access.conf" ]]; then
+	source "/etc/remote_access.conf" || exit 1
+elif [[ -f "${WORKDIR}/remote_access.conf" ]]; then
+	source "${WORKDIR}/remote_access.conf" || exit 1
+else
+	echo "Error: Could not locate remote access config file. Exiting." >&2
+	exit 1
+fi
+
+printf -- "                                                                 Servod\n"
+printf -- "Board         Name          Rev       Version   IP               Port    Relay     Info\n"
+printf -- "------------  ------------  --------  --------  ---------------  ------  --------  ---------------------------------------------------\n"
+
+for file in $(find "${CONFIG_DIR}" -maxdepth 1 -type f -name "*_config" | grep -v "global_config\|empty_config" | sort); do
+	source "${CONFIG_DIR}/empty_config" || exit 1
+	source "${file}" || exit 1
+	BOARD="$(echo $(basename "${file}") | sed 's|_.*||')"
+
+	printf "%-12s  %-12s  %-8s  %-8s  %-15s  %-6s  %6s:%1s  %-50s\n" "${BOARD}" "${VARIANT_NAME}" "${BOARD_REV}" "${BOARD_VERSION}" "${IP_ADDRESS}" "${SERVOD_PORT}" "${WEBPOWER_HOST}" "${POWER_OUTLET_NUM}" "${BOARD_INFO}"
+done
+

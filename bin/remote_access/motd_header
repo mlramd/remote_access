@@ -1,0 +1,10 @@
+To make the PiKVM writable, run 'sudo rw'
+
+Device usage:
+- Run '<board>' to see available commands. Example: 'mayan'
+
+Useful commands:
+- show_boards: Shows the information about all connected boards.
+
+Connected devices:
+

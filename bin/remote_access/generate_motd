@@ -1,0 +1,20 @@
+#!/usr/bin/bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd | sed 's|/remote_access.*||' )
+WORKDIR="${SCRIPT_DIR}/remote_access"
+
+if [[ -f "/etc/remote_access.conf" ]]; then 
+	source "/etc/remote_access.conf" || exit 1
+elif [[ -f "${WORKDIR}/remote_access.conf" ]]; then
+	source "${WORKDIR}/remote_access.conf" || exit 1 
+else
+	echo "Error: Could not locate remote access config file. Exiting." >&2
+	exit 1
+fi
+
+if [[ -e "${WORKDIR}/motd_header" ]]; then
+	cat "${WORKDIR}/motd_header" | sudo tee /etc/motd 
+else
+	sudo rm -f /etc/motd
+fi
+show_boards | sudo tee -a /etc/motd
